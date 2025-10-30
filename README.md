@@ -62,51 +62,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 
 4. Supabase のセットアップ（SQL実行）
 
-Supabase のダッシュボード → SQL Editor に以下スクリプトを実行する：
-
-### scripts/001_create_tables.sql
-
-```sql
--- rooms テーブル
-create table if not exists rooms (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  created_at timestamptz default now()
-);
-
--- messages テーブル
-create table if not exists messages (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid references rooms(id) on delete cascade not null,
-  nickname text not null,
-  content text not null,
-  type text default 'message' check (type in ('message', 'nickname_change')),
-  created_at timestamptz default now()
-);
-
--- インデックス
-create index if not exists messages_room_id_idx on messages(room_id);
-create index if not exists messages_created_at_idx on messages(created_at);
-```
-
-> 注: `type` 列を別スクリプトで追加する替わりにこの時点でまとめて作成している。既に `messages` テーブルがある場合は `002_add_message_type.sql` を実行してカラムを追加する。
-
-### scripts/002_add_message_type.sql
-
-```sql
-alter table messages
-add column if not exists type text default 'message' check (type in ('message', 'nickname_change'));
-update messages set type = 'message' where type is null;
-```
-
-**Realtime の有効化**: Supabase のプロジェクト設定によっては追加設定が必要。通常は Realtime がデフォルトで有効だが、必要に応じて publication にテーブルを追加する。例：
-
-```sql
--- 既存の publication に追加する（プロジェクト構成に応じて実行）
-alter publication supabase_realtime add table messages;
-```
-
-（※ Supabase の管理画面で Realtime 設定や Row Level Security を確認すること）
+Supabase のダッシュボード → SQL Editor で、`scripts/001_create_tables.sql`と`scripts/002_add_message_type.sql`を実行する：
 
 5. 開発サーバー起動
 
