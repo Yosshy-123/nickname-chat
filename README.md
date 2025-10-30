@@ -10,7 +10,6 @@
 * Supabase Realtimeによる即時配信
 * 認証不要・ニックネームベース（参加時にニックネーム入力）
 * Tailwind CSS v4 と shadcn/ui によるモダンなUI
-* モバイル〜デスクトップ対応のレスポンシブ設計
 
 ## 技術スタック
 
@@ -73,66 +72,6 @@ npm run dev
 # pnpm dev
 # bun dev
 ```
-
-ブラウザで `http://localhost:3000` を開く。
-
----
-
-## 主要ファイルと役割
-
-```
-nickname-chat/
-├── app/
-│   ├── room/[id]/page.tsx       # チャットルームページ（Client component）
-│   ├── globals.css              # グローバルスタイル
-│   ├── layout.tsx               # ルートレイアウト
-│   └── page.tsx                 # ルーム一覧ページ
-├── components/
-│   ├── ui/                      # shadcn/ui 用コンポーネント
-│   ├── chat-room.tsx            # チャットルームロジックとUI
-│   ├── create-room-form.tsx     # ルーム作成フォーム
-│   └── room-list.tsx            # ルーム一覧表示
-├── lib/supabase/
-│   ├── client.ts                # クライアント側 Supabase クライアント
-│   └── server.ts                # サーバー側 Supabase クライアント（必要時）
-├── scripts/                     # DB 初期化 SQL
-└── package.json
-```
-
----
-
-## 実装のポイントと注意点
-
-* **ニックネーム管理**: 認証を使わないため、クライアントでニックネームをローカルに保持する。ニックネーム変更は `messages` テーブルに `type = 'nickname_change'` として保存するとクライアント側で扱いやすい。
-
-* **セキュリティ**: 公開クライアントキー（anon key）はクライアントで使うため存在するが、書き込み制御や不正利用対策として Supabase の RLS（Row Level Security）や Function を設定することを推奨する。サービスロールキーは**サーバー側でのみ**使用する。
-
-* **パフォーマンス**: messages の取得は `room_id` と `created_at` によるページング（limit / offset ではなく cursor ベース）を推奨。
-
-* **デプロイ**: Vercel でのデプロイを想定。環境変数（NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY）を Vercel のプロジェクト設定に登録すること。
-
----
-
-## package.json の推奨スクリプト
-
-```json
-{
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  }
-}
-```
-
----
-
-## トラブルシューティング
-
-* **Realtime が来ない**: Supabase のリアルタイム設定と publication を確認。`lib/supabase/client.ts` の `realtime` 初期化を確認。
-* **テーブルスキーマが違う**: `scripts` 内の SQL を再実行し、既存の不一致がないか確認する。
-* **匿名キーの漏洩**: anon key は公開キーだが、サービスロールキーが漏れていないか確認する。
 
 ---
 
