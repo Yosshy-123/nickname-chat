@@ -9,7 +9,6 @@
 * ルーム作成・一覧表示
 * Supabase Realtimeによる即時配信
 * 認証不要・ニックネームベース（参加時にニックネーム入力）
-* ニックネーム変更はリアルタイム通知（`type = 'nickname_change'`）
 * Tailwind CSS v4 と shadcn/ui によるモダンなUI
 * モバイル〜デスクトップ対応のレスポンシブ設計
 
