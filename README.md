@@ -36,7 +36,7 @@
 1. リポジトリをクローン
 
 ```bash
-git clone https://github.com/yourusername/nickname-chat.git
+git clone https://github.com/Yosshy-123/nickname-chat.git
 cd nickname-chat
 ```
 
@@ -178,16 +178,6 @@ nickname-chat/
 * **Realtime が来ない**: Supabase のリアルタイム設定と publication を確認。`lib/supabase/client.ts` の `realtime` 初期化を確認。
 * **テーブルスキーマが違う**: `scripts` 内の SQL を再実行し、既存の不一致がないか確認する。
 * **匿名キーの漏洩**: anon key は公開キーだが、サービスロールキーが漏れていないか確認する。
-
----
-
-## 貢献
-
-PR歓迎。大きな変更は先に Issue で相談すること。
-
-## ライセンス
-
-MIT
 
 ---
 
