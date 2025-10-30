@@ -1,198 +1,196 @@
-# Modern Nickname Chat
+# Nickname Chat
 
-リアルタイムメッセージングを備えたモダンなroom制ニックネームチャットアプリケーション
+## 概要
 
-## 機能
+このリポジトリは、Supabaseのリアルタイムを用いた認証不要のニックネーム制チャットアプリケーションです。ローカルで動作させる手順、Supabaseへのセットアップ、主要ファイル構成、運用・デプロイ上の注意点を明確化してあります。
 
-- **ルーム管理**: チャットルームの作成と一覧表示
-- **リアルタイムチャット**: Supabaseのリアルタイム機能による即座のメッセージ配信
-- **ニックネームシステム**: 認証不要のニックネームベースのチャット
-- **ニックネーム変更**: チャット中にニックネームを変更可能（リアルタイム通知付き）
-- **モダンUI**: Tailwind CSS v4とshadcn/uiによる洗練されたデザイン
-- **レスポンシブ**: モバイルからデスクトップまで対応
+主な特徴：
+
+* ルーム作成・一覧表示
+* Supabase Realtimeによる即時配信
+* 認証不要・ニックネームベース（参加時にニックネーム入力）
+* ニックネーム変更はリアルタイム通知（`type = 'nickname_change'`）
+* Tailwind CSS v4 と shadcn/ui によるモダンなUI
+* モバイル〜デスクトップ対応のレスポンシブ設計
 
 ## 技術スタック
 
-- **フレームワーク**: [Next.js 16](https://nextjs.org/) (App Router)
-- **言語**: [TypeScript](https://www.typescriptlang.org/)
-- **スタイリング**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **UIコンポーネント**: [shadcn/ui](https://ui.shadcn.com/)
-- **データベース**: [Supabase](https://supabase.com/) (PostgreSQL + リアルタイム機能)
-- **状態管理**: React Hooks
-- **アイコン**: [Lucide React](https://lucide.dev/)
+* フレームワーク: Next.js 16（App Router）
+* 言語: TypeScript
+* スタイリング: Tailwind CSS v4
+* UI: shadcn/ui
+* DB/Realtime: Supabase（PostgreSQL）
+* 状態管理: React Hooks
+* アイコン: lucide-react
 
 ## 前提条件
 
-- Node.js 18.x以上
-- npm、yarn、pnpm、またはbunのいずれか
-- Supabaseアカウント（無料プランで可）
+* Node.js 18.x 以上
+* パッケージマネージャ: npm / yarn / pnpm / bun のいずれか
+* Supabase プロジェクト（無料枠で可）
 
-## インストール手順
+---
 
-### 1. リポジトリのクローン
+## インストールと起動（ローカル）
 
-\`\`\`bash
+1. リポジトリをクローン
+
+```bash
 git clone https://github.com/yourusername/nickname-chat.git
 cd nickname-chat
-\`\`\`
+```
 
-### 2. 依存関係のインストール
+2. 依存関係をインストール
 
-\`\`\`bash
+```bash
 npm install
 # または
-yarn install
-# または
-pnpm install
-# または
-bun install
-\`\`\`
+# yarn install
+# pnpm install
+# bun install
+```
 
-### 3. Supabaseプロジェクトのセットアップ
+3. 環境変数を用意
 
-1. [Supabase](https://supabase.com/)でアカウントを作成
-2. 新しいプロジェクトを作成
-3. プロジェクトのURLとAPIキーを取得
+プロジェクトルートに `.env.local` を作成し、以下を設定する。**公開キー（anon key）はクライアント配信用であるため第三者に渡さないこと**。
 
-### 4. 環境変数の設定
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-supabase-project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+# 任意（サーバーサイドで使う場合は別に管理）
+# SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>  # 絶対にクライアントに公開しないこと
+```
 
-プロジェクトルートに`.env.local`ファイルを作成し、以下の環境変数を設定します：
+4. Supabase のセットアップ（SQL実行）
 
-\`\`\`env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-\`\`\`
+Supabase のダッシュボード → SQL Editor に以下スクリプトを実行する：
 
-### 5. データベースのセットアップ
+### scripts/001_create_tables.sql
 
-Supabaseのダッシュボードで、SQL Editorを開き、以下のスクリプトを順番に実行します：
-
-#### `scripts/001_create_tables.sql`
-
-\`\`\`sql
--- roomsテーブルの作成
+```sql
+-- rooms テーブル
 create table if not exists rooms (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  created_at timestamp with time zone default now()
+  created_at timestamptz default now()
 );
 
--- messagesテーブルの作成
+-- messages テーブル
 create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   room_id uuid references rooms(id) on delete cascade not null,
   nickname text not null,
   content text not null,
-  created_at timestamp with time zone default now()
+  type text default 'message' check (type in ('message', 'nickname_change')),
+  created_at timestamptz default now()
 );
 
--- インデックスの作成
+-- インデックス
 create index if not exists messages_room_id_idx on messages(room_id);
 create index if not exists messages_created_at_idx on messages(created_at);
+```
 
--- リアルタイム機能の有効化
-alter publication supabase_realtime add table messages;
-\`\`\`
+> 注: `type` 列を別スクリプトで追加する替わりにこの時点でまとめて作成している。既に `messages` テーブルがある場合は `002_add_message_type.sql` を実行してカラムを追加する。
 
-#### `scripts/002_add_message_type.sql`
+### scripts/002_add_message_type.sql
 
-\`\`\`sql
--- メッセージタイプ列の追加
-alter table messages 
+```sql
+alter table messages
 add column if not exists type text default 'message' check (type in ('message', 'nickname_change'));
-
--- 既存のメッセージにデフォルト値を設定
 update messages set type = 'message' where type is null;
-\`\`\`
+```
 
-### 6. 開発サーバーの起動
+**Realtime の有効化**: Supabase のプロジェクト設定によっては追加設定が必要。通常は Realtime がデフォルトで有効だが、必要に応じて publication にテーブルを追加する。例：
 
-\`\`\`bash
+```sql
+-- 既存の publication に追加する（プロジェクト構成に応じて実行）
+alter publication supabase_realtime add table messages;
+```
+
+（※ Supabase の管理画面で Realtime 設定や Row Level Security を確認すること）
+
+5. 開発サーバー起動
+
+```bash
 npm run dev
 # または
-yarn dev
-# または
-pnpm dev
-# または
-bun dev
-\`\`\`
+# yarn dev
+# pnpm dev
+# bun dev
+```
 
-ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリケーションを確認できます。
+ブラウザで `http://localhost:3000` を開く。
 
-## ビルドとデプロイ
+---
 
-### プロダクションビルド
+## 主要ファイルと役割
 
-\`\`\`bash
-npm run build
-npm run start
-\`\`\`
-
-### Vercelへのデプロイ
-
-このアプリケーションはVercelへのデプロイに最適化されています：
-
-1. [Vercel](https://vercel.com/)でアカウントを作成
-2. GitHubリポジトリをインポート
-3. 環境変数を設定
-4. デプロイ
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
-
-## 使い方
-
-1. **ルームの作成**: トップページでルーム名を入力して「ルームを作成」をクリック
-2. **ルームへの参加**: ルーム一覧から参加したいルームをクリック
-3. **ニックネームの設定**: 初回参加時にニックネームを入力
-4. **メッセージの送信**: メッセージを入力してEnterキーまたは送信ボタンをクリック
-5. **ニックネームの変更**: ヘッダーの設定アイコンをクリックして新しいニックネームを入力
-
-## プロジェクト構造
-
-\`\`\`
+```
 nickname-chat/
 ├── app/
-│   ├── room/[id]/
-│   │   └── page.tsx          # チャットルームページ
-│   ├── globals.css            # グローバルスタイル
-│   ├── layout.tsx             # ルートレイアウト
-│   └── page.tsx               # ルーム一覧ページ
+│   ├── room/[id]/page.tsx       # チャットルームページ（Client component）
+│   ├── globals.css              # グローバルスタイル
+│   ├── layout.tsx               # ルートレイアウト
+│   └── page.tsx                 # ルーム一覧ページ
 ├── components/
-│   ├── ui/                    # shadcn/ui コンポーネント
-│   ├── chat-room.tsx          # チャットルームコンポーネント
-│   ├── create-room-form.tsx   # ルーム作成フォーム
-│   └── room-list.tsx          # ルーム一覧コンポーネント
-├── lib/
-│   └── supabase/
-│       ├── client.ts          # クライアントサイドSupabaseクライアント
-│       └── server.ts          # サーバーサイドSupabaseクライアント
-├── scripts/
-│   ├── 001_create_tables.sql  # 初期テーブル作成
-│   └── 002_add_message_type.sql # メッセージタイプ追加
+│   ├── ui/                      # shadcn/ui 用コンポーネント
+│   ├── chat-room.tsx            # チャットルームロジックとUI
+│   ├── create-room-form.tsx     # ルーム作成フォーム
+│   └── room-list.tsx            # ルーム一覧表示
+├── lib/supabase/
+│   ├── client.ts                # クライアント側 Supabase クライアント
+│   └── server.ts                # サーバー側 Supabase クライアント（必要時）
+├── scripts/                     # DB 初期化 SQL
 └── package.json
-\`\`\`
+```
 
-## 主要な依存関係
+---
 
-- `next@16.0.0` - Reactフレームワーク
-- `react@19.2.0` - UIライブラリ
-- `@supabase/supabase-js` - Supabaseクライアント
-- `@supabase/ssr` - Next.js用Supabase SSR
-- `tailwindcss@4.1.9` - CSSフレームワーク
-- `lucide-react` - アイコンライブラリ
-- `@radix-ui/*` - UIプリミティブ
+## 実装のポイントと注意点
 
-## コントリビューション
+* **ニックネーム管理**: 認証を使わないため、クライアントでニックネームをローカルに保持する。ニックネーム変更は `messages` テーブルに `type = 'nickname_change'` として保存するとクライアント側で扱いやすい。
 
-プルリクエストを歓迎します。大きな変更の場合は、まずissueを開いて変更内容を議論してください。
+* **セキュリティ**: 公開クライアントキー（anon key）はクライアントで使うため存在するが、書き込み制御や不正利用対策として Supabase の RLS（Row Level Security）や Function を設定することを推奨する。サービスロールキーは**サーバー側でのみ**使用する。
+
+* **パフォーマンス**: messages の取得は `room_id` と `created_at` によるページング（limit / offset ではなく cursor ベース）を推奨。
+
+* **デプロイ**: Vercel でのデプロイを想定。環境変数（NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY）を Vercel のプロジェクト設定に登録すること。
+
+---
+
+## package.json の推奨スクリプト
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}
+```
+
+---
+
+## トラブルシューティング
+
+* **Realtime が来ない**: Supabase のリアルタイム設定と publication を確認。`lib/supabase/client.ts` の `realtime` 初期化を確認。
+* **テーブルスキーマが違う**: `scripts` 内の SQL を再実行し、既存の不一致がないか確認する。
+* **匿名キーの漏洩**: anon key は公開キーだが、サービスロールキーが漏れていないか確認する。
+
+---
+
+## 貢献
+
+PR歓迎。大きな変更は先に Issue で相談すること。
 
 ## ライセンス
 
 MIT
 
+---
+
 ## 謝辞
 
-- [Next.js](https://nextjs.org/)
-- [Supabase](https://supabase.com/)
-- [shadcn/ui](https://ui.shadcn.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
+Next.js, Supabase, shadcn/ui, Tailwind CSS, lucide-react
